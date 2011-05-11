@@ -1,0 +1,6 @@
+namespace funcoesThread
+{
+    void* envioDeMensagens (void *ptr);
+    void* recebimentoDeMensagens (void *ptr);
+}
+

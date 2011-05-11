@@ -1,0 +1,20 @@
+#ifndef __CONTROLE__
+#define __CONTROLE__
+
+#include <unistd.h>
+#include <sys/types.h>
+#include <pthread.h>
+#include <map>
+
+class controleThread
+{
+    int sair;
+    
+    pthread_mutex_t mutexEncerramento;
+    pthread_mutex_t mutexListaClientes;
+
+    std::map<
+};
+
+#endif
+
