@@ -5,7 +5,7 @@
 #include <sys/types.h>
 #include <pthread.h>
 #include <queue>
-#include <list>
+#include <set>
 
 #include "mensagem"
 #include "cliente"
@@ -18,7 +18,7 @@ struct Controle
     pthread_mutex_t mutexEncerramento;
     pthread_mutex_t mutexListaClientes;
     pthread_mutex_t mutexFilaMensagens;
-    std::list<Cliente> listaClientes; 
+    std::set<Cliente> listaClientes; 
 
     std::queue<Mensagem> filaMensagens;
 

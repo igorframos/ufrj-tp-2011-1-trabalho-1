@@ -15,11 +15,10 @@ struct Cliente
     socklen_t tamanho;
     pthread_t thread;
 
-    Cliente(std::string nome = "", int socketEnvioID = -1): nome(nome), socketEnvioID(socketEnvioID)
-    {
-        tamanho = sizeof(endereco);
-    }
+    Cliente(const std::string = "", const int socketEnvioID = -1);
 };
+
+bool operator<(const Cliente&, const Cliente&);
 
 #endif
 
