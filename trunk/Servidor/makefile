@@ -14,3 +14,6 @@ object/main.o: source/main.cpp headers/prototipos
 object/funcoesThread.o: source/funcoesThread.cpp
 	$(CC) $(CFLAGS) source/funcoesThread.cpp && mv funcoesThread.o object
 
+clean:
+	rm bin/* object/*
+

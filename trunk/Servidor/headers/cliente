@@ -1,14 +1,24 @@
 #ifndef __CLIENTE__
 #define __CLIENTE__
 
+#include <pthread.h>
+#include <sys/types.h>
 #include <string>
+#include <netinet/in.h>
+#include <sys/socket.h>
 
 struct Cliente
 {
-    string nome;
+    std::string nome;
     int socketEnvioID;
+    sockaddr_in endereco;
+    int tamanho;
+    pthread_t thread;
 
-    Cliente(string nome = "", int socketID = -1): nome(nome), socketID(socketID) {}
+    Cliente(std::string nome = "", int socketEnvioID = -1): nome(nome), socketEnvioID(socketEnvioID)
+    {
+        tamanho = sizeof(endereco);
+    }
 };
 
 #endif

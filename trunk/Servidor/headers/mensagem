@@ -6,10 +6,10 @@ struct Mensagem
     char remetente[32];
     char texto[1024];
 
-    Mensagem(char remetente[32], char texto[1024])
+    Mensagem(char remetente2[32], char texto2[1024])
     {
-        strncpy(this.remetente, remetente, sizeof(this.remetente));
-        strncpy(this.texto, texto, sizeof(this.texto));
+        strncpy(remetente, remetente2, sizeof(remetente));
+        strncpy(texto, texto2, sizeof(texto));
     }
 };
 

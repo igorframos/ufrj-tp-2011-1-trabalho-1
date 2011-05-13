@@ -5,8 +5,10 @@
 #include <sys/types.h>
 #include <pthread.h>
 #include <queue>
+#include <list>
 
 #include "mensagem"
+#include "cliente"
 
 // Falta guardar o grupo de alguma forma aqui.
 struct Controle
@@ -15,6 +17,7 @@ struct Controle
 
     pthread_mutex_t mutexEncerramento;
     pthread_mutex_t mutexListaClientes;
+    pthread_mutex_t mutexFilaMensagens;
     std::list<Cliente> listaClientes; 
 
     std::queue<Mensagem> filaMensagens;
@@ -23,6 +26,7 @@ struct Controle
     {
         pthread_mutex_init(&mutexEncerramento, NULL);
         pthread_mutex_init(&mutexListaClientes, NULL);
+        pthread_mutex_init(&mutexFilaMensagens, NULL);
     }
 };
 
