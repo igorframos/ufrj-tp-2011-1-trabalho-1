@@ -4,6 +4,12 @@
  * Envio de mensagens, recebimento de conexões e recebimento de mensagens são as tarefas que devem
  * ser executadas pelas threads.
  *
+ * FIX
+ *
+ * Refatorar o código para dividir essa joça em funções.
+ *
+ * TODO
+ *
  * Falta fazer o pedaço de enviar mensagens via UDP e enviar para o cliente a questão de se inscrever
  * no grupo UDP.
  *
@@ -170,13 +176,6 @@ namespace funcoesThread
         Cliente cliente = *(dados->cliente);
         Controle *controle = dados->controle;
         delete dados;
-
-        /*
-         * FIX
-         *
-         * Resolver problema de cliente lento travando conexão de todos os outros clientes.
-         * Tomar cuidado com cliente lento x cliente rápido tomando o nome que ele vai escolher.
-         */
 
         // Recebe o nome de usuário, verifica sua unicidade e, caso não seja único, avisa o cliente para
         // que este escolha outro.
