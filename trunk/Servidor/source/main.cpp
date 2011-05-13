@@ -29,9 +29,8 @@
 
 int main (int argc, char *argv[])
 {
-    int sair = 0;
-    pthread_t threadEnvio, threadConexao;
-    pthread_mutex_t mutexEncerramento, mutexListaClientes;
+    pthread_t threadEnvio, threadConexao, threadRecebimento;
+    Controle controle(0); 
 
     pthread_mutex_init(&mutexEncerramento, NULL);
     pthread_mutex_init(&mutexListaClientes, NULL);

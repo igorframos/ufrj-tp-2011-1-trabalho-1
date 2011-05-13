@@ -4,16 +4,26 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <pthread.h>
-#include <map>
+#include <queue>
 
-class controleThread
+#include "mensagem"
+
+// Falta guardar o grupo de alguma forma aqui.
+struct Controle
 {
     int sair;
-    
+
     pthread_mutex_t mutexEncerramento;
     pthread_mutex_t mutexListaClientes;
+    std::list<Cliente> listaClientes; 
 
-    std::map<
+    std::queue<Mensagem> filaMensagens;
+
+    Controle(int sair = 0): sair(sair)
+    {
+        pthread_mutex_init(&mutexEncerramento, NULL);
+        pthread_mutex_init(&mutexListaClientes, NULL);
+    }
 };
 
 #endif

@@ -1,0 +1,15 @@
+#ifndef __CLIENTE__
+#define __CLIENTE__
+
+#include <string>
+
+struct Cliente
+{
+    string nome;
+    int socketEnvioID;
+
+    Cliente(string nome = "", int socketID = -1): nome(nome), socketID(socketID) {}
+};
+
+#endif
+
