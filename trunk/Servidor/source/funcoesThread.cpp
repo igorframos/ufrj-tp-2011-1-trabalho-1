@@ -1,3 +1,13 @@
+/*
+ * Funções usadas nas threads do programa.
+ *
+ * Envio de mensagens, recebimento de conexões e recebimento de mensagens são as tarefas que devem
+ * ser executadas pelas threads.
+ *
+ * BUGS:
+ *  - Recebimento de conexões não está recebendo o sinal de finalizar o programa. Provavelmente
+ *    está presa no accept de novas conexões. Ainda não sei como resolver.
+ */
 #include <cstdio>
 #include <iostream>
 #include <cstring>
@@ -26,9 +36,11 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
+#include "../headers/dados"
 #include "../headers/cliente"
 #include "../headers/mensagem"
 #include "../headers/controle"
+#include "../headers/prototipos"
 
 namespace funcoesThread
 {
@@ -47,7 +59,7 @@ namespace funcoesThread
 
         std::cout << "Thread de envio de mensagens criada corretamente." << std::endl;
 
-        while (!(controle->sair))   // Enquanto não for recebida a ordem de sair do programa
+        while (!(controle->sair))
         {
             pthread_mutex_lock(&controle->mutexFilaMensagens);  // Trava a fila de mensagens (controle de concorrência)
 
@@ -76,7 +88,7 @@ namespace funcoesThread
         int socketID;           // Identificador do socket que receberá as conexões.
         sockaddr_in serv_addr;  // Cria um endereço para o servidor.
          
-        // Abre canal de comunicação externa.
+        // Abre canal de comunicação externa com protocolo TCP.
         socketID = socket(AF_INET, SOCK_STREAM, 0);
         if (socketID < 0)
         {
@@ -84,9 +96,9 @@ namespace funcoesThread
             return NULL;
         }
      
-        serv_addr.sin_family = AF_INET;            // Cria um endereço IPv4 local.
+        serv_addr.sin_family = AF_INET;            // Determina a família de sockets.
         serv_addr.sin_port = htons(porta);         // Determina uma porta para a comunicação.
-        serv_addr.sin_addr.s_addr = INADDR_ANY;    // Recebe todos os pacotes da porta.
+        serv_addr.sin_addr.s_addr = INADDR_ANY;    // Recebe pacotes para qualquer IP da máquina.
      
         // Liga o canal criado ao endereço da máquina. Usa o sockaddr que foi criado acima.
         if (bind(socketID, (const sockaddr*) &serv_addr, sizeof(serv_addr)))
@@ -106,34 +118,14 @@ namespace funcoesThread
             return NULL;
         }
          
-        /*
-         *
-         * FIX
-         *
-         * Esse trecho está muito dependente das variáveis do programa de SO e deve ser reescrito
-         * para se adequar ao trabalho de TP. Também está incongruente com o objetivo do trabalho
-         * de TP.
-         *
-         * Esse trecho deve ser responsável por aguardar uma conexão TCP com algum cliente e criar
-         * a thread que vai receber as mensagens vindas por uma conexão TCP que seja estabelecida.
-         *
-         * A aplicação cliente deve se conectar.
-         * O servidor envia uma lista com os usuários online.
-         * A aplicação cliente envia o nome de usuário.
-         * Servidor envia endereço do grupo para a conexão multicast via UDP e passa a aguardar mensagens.
-         *
-         * Uma parte desse algoritmo é feita aqui, a outra é feita na thread que trata cada cliente.
-         *
-         */
-
         // Para cada conexão recebida cria uma nova thread para lidar com ela e volta a esperar
         // nova conexão externa.
-        pthread_mutex_lock(&controle->mutexEncerramento);
+        pthread_mutex_lock(&controle->mutexEncerramento);   // Controle de concorrência na variável controle->sair.
         while (!controle->sair)
         {
-            pthread_mutex_unlock(&controle->mutexEncerramento);
+            pthread_mutex_unlock(&controle->mutexEncerramento); // Libera a variável controle->sair.
 
-            Cliente *cliente = new Cliente();
+            Cliente *cliente = new Cliente();       // Cria um novo cliente e aguarda uma conexão.
             cliente->socketEnvioID = accept(socketID, (sockaddr*) &(cliente->endereco), &(cliente->tamanho));
             if (cliente->socketEnvioID < 0)
             {
@@ -141,38 +133,18 @@ namespace funcoesThread
                 return NULL;
             }
 
-            /*
-             * Problemas com a forma como deve ser feita a passagem dos dados.
-             * Preciso passar os dados que já tenho do cliente e, ao mesmo tempo, passar os dados globais do programa.
-             * Saída deve ser agrupar os dois em um outra estrutura só para essa transmissão.
-             */
-            if (pthread_create(&(cliente->thread), NULL, recebimentoDeMensagens, /******************************/))
+            Dados dados(cliente, controle);     // Cria uma estrutura para transferir dados para a nova thread.
+                                                // Os dados são as informações da conexão com o cliente e as
+                                                // variáveis de controle.
+
+            // Cria a thread que vai lidar especificamente com o cliente atual.
+            if (pthread_create(&(cliente->thread), NULL, recebimentoDeMensagens, (void*) &dados))
             {
                 std::cout << "Não é possível criar thread para o cliente. Ignorando conexão." << std::endl;
             }
             
-            pthread_mutex_lock(&controle->mutexEncerramento);
+            pthread_mutex_lock(&controle->mutexEncerramento);   // Controle de concorrência na variável controle->sair.
         }
-        /*
-        pthread_mutex_lock(&controle->mutexEncerramento);
-        while (!controle->sair)
-        {
-            pthread_mutex_unlock(&controle->mutexEncerramento);
-            Cliente *cliente = new Cliente();
-            cliente->socketEnvioID = accept(socketID, (sockaddr*) &(cliente->addr), &(cliente->size));
-            if (cliente->socketEnvioID < 0)
-            {
-                cout << "Impossível receber conexões externas (accept). Encerrando a aplicação." << std::endl;
-                return NULL;
-            }
-            if (pthread_create(&(cliente->thread), NULL, recebe_dados, cliente))
-            {
-                cout << "Impossível criar thread para tratar conexões externas. Ignorando conexão." << std::endl;
-            }
-             pthread_mutex_lock(&controle->mutexEncerramento);
-        }
-        close(socketID);
-        */
 
         std::cout << "Thread recebimentoDeConexoes encerrada." << std::endl;
         return NULL;
@@ -182,10 +154,34 @@ namespace funcoesThread
     {
         std::cout << "Thread de recebimento de mensagens criada corretamente. Uma conexão foi estabelecida." << std::endl;
 
-        int *sair = (int*) ptr;
+        // Recebe os dados e libera a memória da variável que foi usada só para passar essas informações.
+        Dados *dados = (Dados*) ptr;
+        Cliente cliente = *(dados->cliente);
+        Controle *controle = dados->controle;
+        delete dados;
 
-        while (!(*sair))
+        /*
+         * A aplicação cliente envia o nome de usuário.
+         * O servidor envia uma lista com os usuários online.
+         * Servidor envia endereço do grupo para a conexão multicast via UDP.
+         */
+
+        Mensagem mensagem;      // Estrutura do tipo mensagem que será recebida do cliente.
+        pthread_mutex_lock(&controle->mutexEncerramento);   // Controle de concorrência da variável controle->sair.
+        while (!(controle->sair))
         {
+            pthread_mutex_unlock(&controle->mutexEncerramento);  // Libera a variável controle->sair.
+
+            read(cliente.socketEnvioID, &mensagem, sizeof(mensagem));  // Recebe uma mensagem do cliente.
+            if (mensagem.texto[0] == -1) break;     // Acordo para dizer que o cliente está desconectando.
+
+            // Controla a concorrência sobre a variável controle->filaMensagens com semáforos.
+            // Insere a mensagem recebida na fila de mensagens a serem repassadas aos clientes.
+            pthread_mutex_lock(&controle->mutexFilaMensagens);
+            controle->filaMensagens.push(mensagem);
+            pthread_mutex_unlock(&controle->mutexFilaMensagens);
+
+            pthread_mutex_lock(&controle->mutexEncerramento);   // Controle de concorrência da variável controle->sair.
         }
 
         return NULL;

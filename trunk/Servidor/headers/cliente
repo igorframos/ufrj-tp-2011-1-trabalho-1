@@ -12,7 +12,7 @@ struct Cliente
     std::string nome;
     int socketEnvioID;
     sockaddr_in endereco;
-    int tamanho;
+    socklen_t tamanho;
     pthread_t thread;
 
     Cliente(std::string nome = "", int socketEnvioID = -1): nome(nome), socketEnvioID(socketEnvioID)
