@@ -1,6 +1,8 @@
 #ifndef __MENSAGEM__
 #define __MENSAGEM__
 
+#include <cstring>
+
 struct Mensagem
 {
     char remetente[32];
