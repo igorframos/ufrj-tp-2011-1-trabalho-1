@@ -40,6 +40,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include "../headers/dados"
 #include "../headers/cliente"
@@ -62,6 +63,31 @@ namespace funcoesThread
 
         std::cout << "Thread de envio de mensagens criada corretamente." << std::endl;
 
+        // =======================================================================================================
+        // Experimentando criar o socket e o grupo UDP. Vamos ver no que dá isso.
+        // =======================================================================================================
+
+        int socketID;
+        const int porta = 2012;
+        sockaddr_in grupo;
+        char enderecoGrupo[] = "242.192.4.4";
+
+        socketID = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if (socketID < 0)
+        {
+            std::cout << "Erro ao criar socket UDP. Encerrando thread de envio de mensagens." << std::endl;
+            return NULL;
+        }
+
+        bzero(&grupo, sizeof(grupo));
+        grupo.sin_family = AF_INET;
+        grupo.sin_addr.s_addr = inet_addr(enderecoGrupo);
+        grupo.sin_port = htons(porta);
+
+        // =======================================================================================================
+        // Fim do experimento
+        // =======================================================================================================
+
         pthread_mutex_lock(&controle->mutexEncerramento);   // Controle de concorrência da variável controle->sair.
         while (!(controle->sair))
         {
@@ -74,7 +100,12 @@ namespace funcoesThread
                 Mensagem m = controle->filaMensagens.front();   // Retirar primeira mensagem da fila e enviar.
                 controle->filaMensagens.pop();
 
-                // Falta aqui o código que envia de fato uma mensagem.
+                // Código ainda em teste que deveria enviar uma mensagem.
+                if (sendto(socketID, &m, sizeof(m), 0, (sockaddr*) &grupo, sizeof(grupo)) < 0)
+                {
+                    std::cout << "Erro ao enviar mensagem via socket UDP. Encerrando thread de envio de mensagens." << std::endl;
+                    return NULL;
+                }
             }
             pthread_mutex_unlock(&controle->mutexFilaMensagens);    // Destrava a fila de mensagens.
 
@@ -143,8 +174,6 @@ namespace funcoesThread
         {
             return NULL;
         }
-
-        // Só falta aqui mandar a parada do UDP, seja lá como se faz isso.
 
         // Fica recebendo as mensagens e adicionando à fila de mensagens a serem enviadas.
         comunicacao::recebeMensagens(controle, cliente);
