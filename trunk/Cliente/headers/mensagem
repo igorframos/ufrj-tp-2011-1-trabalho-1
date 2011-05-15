@@ -1,11 +1,14 @@
 #ifndef __MENSAGEM__
 #define __MENSAGEM__
 
+#include <cstring>
+
 struct Mensagem
 {
     char remetente[32];
     char texto[1024];
 
+    Mensagem() {}
     Mensagem(char remetente2[32], char texto2[1024])
     {
         strncpy(remetente, remetente2, sizeof(remetente));

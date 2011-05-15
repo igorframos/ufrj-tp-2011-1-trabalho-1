@@ -1,14 +1,4 @@
-/*
- *
- * Algoritmo de detecção de que uma mensagem não foi enviada:
- *  Envia mensagem
- *  Como o envio é via TCP, isso é garantido
- *  Assim que a mensagem for enviada, inicia um timer
- *  Se o timer acabar antes de receber a mensagem de volta, significa que a mensagem não foi enviada e que, portanto, o 
- *      usuário deve ser avisado
- *  Se o timer não acabar antes de a mensagem chegar de volta, significa que a mensagem foi enviada e recebida ok e, portanto,
- *      não tenho que avisar nada ao usuário
- * 
+/* 
  * Ideia de funcionamento desse programa Cliente:
  *  Cliente tem uma conexão TCP que envia mensagens para o Servidor.
  *  Cliente tem uma conexão UDP que recebe mensagens do Servidor.
@@ -17,14 +7,6 @@
  *  O Cliente recebe a mensagem e acrescenta à janela de mensagens recebidas. Uma mensagem enviada, para a janela de mensagens
  *      recebidas, não existe. Esta só acrescenta uma nova mensagem quando ela chega do Servidor, ou seja, quando os destinatários não
  *      receberem a mensagem, exibe-se um alerta e o cliente vê a própria mensagem anexada ao final da conversa.
- *
- *  Estou "estudando" agora como fazer a conexão e o armazenamento dos nomes de usuários no Servidor. Estudando entre aspas porque,
- *      na verdade, estou apenas pensando a respeito. Não acho que tenha uma fórmula secreta, então não tenho que estudar, só decidir
- *      como vai ser feito e implementar.
- *
- *  Além disso, eu não tenho muita ideia de como vai funcionar. Não tenho a menor ideia de como será feita a interface gráfica ainda e nem
- *      de como ela vai se comunicar com o programa, mas acho que isso não deve ser muito complicado uma vez que vamos usar Qt.
- *
  */
 
 #include <cstdio>
@@ -56,6 +38,11 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/udp.h>
+
+#include "../headers/controle"
+#include "../headers/mensagem"
+#include "../headers/prototipos"
+
 namespace funcoesThread
 {
     // Estabelece uma conexão TCP com o servidor para enviar as msgs e fica aguardando mensagens para serem enviadas.
@@ -63,14 +50,104 @@ namespace funcoesThread
     {
         std::cout << "Thread de envio de mensagens criada corretamente." << std::endl;
         
-        int *sair = (int*) ptr;
+        Controle *controle = (Controle*) ptr;
 
-        int sockfd;
+        int socketID;
+        hostent *servidor;
+        const int porta = 2011;
+        sockaddr_in enderecoServidor;
 
-        sockfd = socket(AF_INET, SOCK_STREAM, 0);
-        
-        while (!(*sair))
+        socketID = socket(AF_INET, SOCK_STREAM, 0);
+        if (socketID < 0)
         {
+            std::cout << "Impossível abrir socket para comunicação externa. Encerrando thread." << std::endl;
+            return NULL;
+        }
+
+        // Está conectando sempre a localhost. Resolver isso.
+        servidor = gethostbyname("localhost");
+        if (!servidor)
+        {
+            std::cout << "Servidor não encontrado. Encerrando thread." << std::endl;
+            return NULL;
+        }
+
+        bzero(&enderecoServidor, sizeof(enderecoServidor));
+        enderecoServidor.sin_family = AF_INET;
+        enderecoServidor.sin_port = htons(porta);
+        bcopy((char*) servidor->h_addr, (char*) &enderecoServidor.sin_addr.s_addr, servidor->h_length);
+
+        if (connect(socketID, (sockaddr*) &enderecoServidor, sizeof(enderecoServidor)) < 0)
+        {
+            std::cout << "Impossível estabelecer conexão com o servidor. Encerrando thread." << std::endl;
+            return NULL;
+        }
+
+        char nome[32];
+        bool nomeInvalido = true;
+        while (nomeInvalido)
+        {
+            std::cin.getline(nome, 32);
+            std::cout << "Nome escolhido: " << nome << std::endl;
+
+            if (write(socketID, &nome, sizeof(nome)) < 0)
+            {
+                std::cout << "Não foi possível enviar o nome para o servidor. Encerrando thread." << std::endl;
+                return NULL;
+            }
+
+            if (read(socketID, &nomeInvalido, sizeof(nomeInvalido)) < 0)
+            {
+                std::cout << "Não foi possível receber resposta do servidor sobre o nome. Encerrando thread." << std::endl;
+            }
+
+            if (nomeInvalido)
+            {
+                std::cout << "Nome não disponível. Tente novamente." << std::endl;
+            }
+        }
+
+        int tamanhoListaClientes;
+        if (read(socketID, &tamanhoListaClientes, sizeof(tamanhoListaClientes)) < 0)
+        {
+            std::cout << "Erro no recebimento da lista de clientes ativos. Não recebido o tamanho. Encerrando thread." << std::endl;
+            return NULL;
+        }
+
+        for (int i = 0; i < tamanhoListaClientes; ++i)
+        {
+            char nomeCliente[32];
+
+            if (read(socketID, nomeCliente, sizeof(nomeCliente)) < 0)
+            {
+                std::cout << "Não foi possível receber o nome de todos os clientes. Encerrando thread." << std::endl;
+                return NULL;
+            }
+
+            pthread_mutex_lock(&controle->mutexListaClientes);
+            controle->listaClientes.insert(nomeCliente);
+            pthread_mutex_unlock(&controle->mutexListaClientes);
+        }
+
+        while (!controle->sair)
+        {
+            char linha[1024];
+            std::cin.getline(linha, 1024);
+
+            Mensagem m;
+            strncpy(m.remetente, nome, sizeof(m.remetente));
+            strncpy(m.texto, linha, sizeof(m.texto));
+            std::cout << m.remetente << std::endl;
+
+            if (write(socketID, &m, sizeof(m)) < 0)
+            {
+                std::cout << "Mensagem não pôde ser enviada." << std::endl;
+            }
+
+            if (!strcmp(linha, "exit_program"))
+            {
+                controle->sair = 1;
+            }
         }
         
         return NULL;
@@ -81,59 +158,9 @@ namespace funcoesThread
     {
         std::cout << "Thread de recebimento de mensagens criada corretamente." << std::endl;
         
-        int *sair = (int*) ptr;
-        
-        // Código copiado quase sem entendimento para tentar entender. Não tô entendendo! <o>
-        
-        int sockfd;
-        struct sockaddr_in sockaddr_group;
-        struct hostent *group;
-        struct ip_mreq mreq;
-        
-        std::cout << "hey!" << std::endl;
-        
-        sockfd = socket(AF_INET, SOCK_DGRAM, 0); // Cria um socket UDP. Essa parte é padrão e fácil.
-        
-        std::cout << "yo o/" << std::endl;
-
-        bzero(&mreq,sizeof(struct ip_mreq)); // Está zerando o mreq, ainda que eu não saiba o que ele é.
-
-        // set group
-
-        std::cout << "olá" << std::endl;
-        
-	// Tenta pegar o host pelo nome para entrar no grupo dele. Não é bem o que a gente quer fazer, mas talvez seja
-	// parecido. Vou ver como isso foi feito no trabalho de SO.
-    // Provavelmente é aqui que está falhando, uma vez que estou sem internet e, com isso, não tenho como acessar
-	// nenhum DNS.
-	if ((group = gethostbyname("localhost")) == (struct hostent *)0) {
-            std::cout << "gethostbyname error: fails for host " << "localhost" << std::endl;
-            *sair = 1;
-        }
-        
-        std::cout << "gaga" << std::endl;
-
-        struct in_addr ia;
-        bcopy((void*)group->h_addr, (void*)&ia, group->h_length); // Copia as informações do grupo pro in_addr ia.
-        
-        bcopy(&ia, &mreq.imr_multiaddr.s_addr, sizeof(struct in_addr)); // Copia as informações de ia para o mreq.
-									                                    // Pelo que parece, é onde ficam guardados os endereços.
-
-        // set interface
-
-        mreq.imr_interface.s_addr = htonl(INADDR_ANY); // Não tenho ideia do que essa linha faz.
-
-        // do membership call
-
-	    // Pelo comentário que já tinha aqui e pela chamada da função, parece que é aqui que o cara pede pra fazer parte do grupo.
-        if (setsockopt(sockfd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) == -1) {
-            std::cerr << "error: setsockopt(IP_ADD_MEMBERSHIP) fails with errno " << errno << std::endl;
-            *sair = 1;
-        }
-        
-        std::cout << "oi" << std::endl;
-        
-        while (!(*sair))
+       Controle *controle = (Controle*) ptr;
+       
+        while (!controle->sair)
         {
         }
         

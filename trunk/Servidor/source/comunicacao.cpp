@@ -91,7 +91,7 @@ namespace comunicacao
             pthread_mutex_unlock(&controle->mutexEncerramento);  // Libera a variável controle->sair.
 
             read(cliente.socketEnvioID, &mensagem, sizeof(mensagem));  // Recebe uma mensagem do cliente.
-            if (mensagem.texto[0] == -1) break;     // Acordo para dizer que o cliente está desconectando.
+            if (!strcmp(mensagem.texto, "exit_program")) break;     // Acordo para dizer que o cliente está desconectando.
 
             // Controla a concorrência sobre a variável controle->filaMensagens com semáforos.
             // Insere a mensagem recebida na fila de mensagens a serem repassadas aos clientes.

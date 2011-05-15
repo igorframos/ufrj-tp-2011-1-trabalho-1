@@ -103,15 +103,20 @@ namespace funcoesThread
                 // Código ainda em teste que deveria enviar uma mensagem.
                 if (sendto(socketID, &m, sizeof(m), 0, (sockaddr*) &grupo, sizeof(grupo)) < 0)
                 {
+                    close(socketID);
                     std::cout << "Erro ao enviar mensagem via socket UDP. Encerrando thread de envio de mensagens." << std::endl;
                     return NULL;
                 }
+
+                std::cout << m.remetente << ">> " << m.texto << std::endl;
             }
             pthread_mutex_unlock(&controle->mutexFilaMensagens);    // Destrava a fila de mensagens.
 
             pthread_mutex_lock(&controle->mutexEncerramento);   // Controle de concorrência da variável controle->sair.
         }
         pthread_mutex_unlock(&controle->mutexEncerramento);
+
+        close(socketID);
 
         std::cout << "Thread envioDeMensagens encerrada." << std::endl;
         return NULL;
@@ -135,14 +140,17 @@ namespace funcoesThread
 
         if (!comunicacao::criaSocket(controle, socketID, serv_addr))
         {
+            close(socketID);
             return NULL;
         }
 
         if (!comunicacao::recebeConexoes(controle, socketID))
         {
+            close(socketID);
             return NULL;
         } 
 
+        close(socketID);
         std::cout << "Thread recebimentoDeConexoes encerrada." << std::endl;
         return NULL;
     }
@@ -161,7 +169,6 @@ namespace funcoesThread
         Dados *dados = (Dados*) ptr;
         Cliente cliente = *(dados->cliente);
         Controle *controle = dados->controle;
-        delete dados;
 
         // Recebe um nome de usuário e o valida. Coloca o nome em cliente e insere cliente no set de clientes.
         if (!comunicacao::recebeNomeUsuario(controle, cliente))

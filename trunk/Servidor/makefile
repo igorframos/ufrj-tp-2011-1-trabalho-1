@@ -1,9 +1,9 @@
 OBJ = object/main.o object/funcoesThread.o object/cliente.o object/comunicacao.o
 CPP = source/main.cpp source/funcoesThread.cpp source/cliente.cpp source/comunicacao.cpp
 CC = g++
-DEBUG = -g
+DEBUG = 
 LFLAGS = -Wall -lm -lrt
-CFLAGS = -c -Wall
+CFLAGS = -c -Wall -O2
 HEADERSTHREAD =  headers/prototipos headers/cliente headers/controle headers/dados headers/mensagem
 HEADERSMAIN = headers/prototipos headers/controle
 HEADERSCOMUNICACAO = headers/cliente headers/controle headers/mensagem headers/prototipos

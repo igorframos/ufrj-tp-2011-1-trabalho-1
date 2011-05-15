@@ -23,16 +23,21 @@
 #include <sys/msg.h>
 #include <sys/ipc.h>
 #include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
 
+#include "../headers/controle"
 #include "../headers/prototipos"
 
 int main (int argc, char *argv[])
 {
     int sair = 0;
     pthread_t threadEnvio, threadRecebimento;
+    Controle controle(0);
 
     std::cout << "Criando thread de envio de mensagens." << std::endl;    
-    if (pthread_create(&threadEnvio, NULL, funcoesThread::envioDeMensagens, (void*) &sair) != 0)
+    if (pthread_create(&threadEnvio, NULL, funcoesThread::envioDeMensagens, (void*) &controle) != 0)
     {
         std::cout << "Erro na criação da thread que enviaria mensagens. Programa será abortado." << std::endl;
         exit(1);
@@ -45,19 +50,10 @@ int main (int argc, char *argv[])
         exit(1);
     }
     
-    while (!sair)
-    {
-        char c;
-        
-        std::cin >> c;        
-        if (c == 's' || c == 'S')
-        {
-            sair = 1;
-        }
-    }
+    while (!controle.sair);
 
-    pthread_join(threadEnvio, NULL);
-    pthread_join(threadRecebimento, NULL);
+    pthread_cancel(threadEnvio);
+    pthread_cancel(threadRecebimento);
 
     return 0;
 }

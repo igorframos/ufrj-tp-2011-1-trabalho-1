@@ -1,5 +1,11 @@
+#ifndef __PROTOTIPOS__
+#define __PROTOTIPOS__
+
 namespace funcoesThread
 {
     void* envioDeMensagens (void *ptr);
     void* recebimentoDeMensagens (void *ptr);
 }
+
+#endif
+
