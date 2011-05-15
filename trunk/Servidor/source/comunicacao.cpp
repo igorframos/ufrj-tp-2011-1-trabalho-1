@@ -97,6 +97,7 @@ namespace comunicacao
             // Insere a mensagem recebida na fila de mensagens a serem repassadas aos clientes.
             pthread_mutex_lock(&controle->mutexFilaMensagens);
             controle->filaMensagens.push(mensagem);
+            std::cout << "Fila de mensagens tem " << controle->filaMensagens.size() << " mensagens na fila." << std::endl;
             pthread_mutex_unlock(&controle->mutexFilaMensagens);
 
             pthread_mutex_lock(&controle->mutexEncerramento);   // Controle de concorrência da variável controle->sair.

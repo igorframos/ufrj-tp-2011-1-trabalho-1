@@ -77,10 +77,7 @@ int main (int argc, char *argv[])
         }
     }
 
-    std::cout << "Aguardando encerramento das threads." << std::endl;
-    // Aguarda o fim das threads do programa antes de encerrar.
-    pthread_join(threadEnvio, NULL);
-    pthread_join(threadConexao, NULL);
+    std::cout << "Encerrando programa." << std::endl;
 
     return 0;
 }

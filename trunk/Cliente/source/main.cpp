@@ -52,8 +52,7 @@ int main (int argc, char *argv[])
     
     while (!controle.sair);
 
-    pthread_cancel(threadEnvio);
-    pthread_cancel(threadRecebimento);
+    std::cout << "Encerrando main." << std::endl;
 
     return 0;
 }

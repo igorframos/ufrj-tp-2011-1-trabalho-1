@@ -70,9 +70,10 @@ namespace funcoesThread
         int socketID;
         const int porta = 2012;
         sockaddr_in grupo;
-        char enderecoGrupo[] = "242.192.4.4";
+        char enderecoGrupo[] = "230.145.0.1";
+        in_addr interfaceLocal;
 
-        socketID = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        socketID = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
         if (socketID < 0)
         {
             std::cout << "Erro ao criar socket UDP. Encerrando thread de envio de mensagens." << std::endl;
@@ -83,6 +84,13 @@ namespace funcoesThread
         grupo.sin_family = AF_INET;
         grupo.sin_addr.s_addr = inet_addr(enderecoGrupo);
         grupo.sin_port = htons(porta);
+        interfaceLocal.s_addr = INADDR_ANY;
+        if (setsockopt(socketID, IPPROTO_IP, IP_MULTICAST_IF, &interfaceLocal, sizeof(interfaceLocal)) < 0)
+        {
+            std::cout << "Erro ao preparar interface local para multicast via UDP. Encerrando thread." << std::endl;
+            close(socketID);
+            return NULL;
+        }
 
         // =======================================================================================================
         // Fim do experimento
@@ -109,6 +117,7 @@ namespace funcoesThread
                 }
 
                 std::cout << m.remetente << ">> " << m.texto << std::endl;
+                std::cout << "Fila de mensagens tem " << controle->filaMensagens.size() << " mensagens na fila." << std::endl;
             }
             pthread_mutex_unlock(&controle->mutexFilaMensagens);    // Destrava a fila de mensagens.
 
@@ -184,6 +193,12 @@ namespace funcoesThread
 
         // Fica recebendo as mensagens e adicionando à fila de mensagens a serem enviadas.
         comunicacao::recebeMensagens(controle, cliente);
+
+        std::cout << "Encerrando conxão de " << cliente.nome << "." << std::endl;
+        pthread_mutex_lock(&controle->mutexListaClientes);
+        controle->listaClientes.erase(controle->listaClientes.find(cliente));
+        pthread_mutex_unlock(&controle->mutexListaClientes);
+        std::cout << "Conexão de " << cliente.nome << " encerrada." << std::endl;
 
         return NULL;
     }

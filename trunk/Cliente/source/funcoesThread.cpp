@@ -38,6 +38,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/udp.h>
+#include <arpa/inet.h>
 
 #include "../headers/controle"
 #include "../headers/mensagem"
@@ -146,9 +147,14 @@ namespace funcoesThread
 
             if (!strcmp(linha, "exit_program"))
             {
+                pthread_mutex_lock(&controle->mutexEncerramento);
                 controle->sair = 1;
+                pthread_mutex_unlock(&controle->mutexEncerramento);
             }
         }
+
+        close(socketID);
+        std::cout << "Encerrando programa." << std::endl;
         
         return NULL;
     }
@@ -158,12 +164,71 @@ namespace funcoesThread
     {
         std::cout << "Thread de recebimento de mensagens criada corretamente." << std::endl;
         
-       Controle *controle = (Controle*) ptr;
-       
+        Controle *controle = (Controle*) ptr;
+
+        int socketID;
+        ip_mreq grupo;
+        sockaddr_in socketLocal;
+        Mensagem m;
+        const int porta = 2012;
+        char enderecoGrupo[] = "230.145.0.1";
+        socklen_t addrlen;
+
+        socketID = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
+        if (socketID < 0)
+        {
+            std::cout << "Impossível abrir socket UDP para receber mensagens. Encerrando thread." << std::endl;
+            return NULL;
+        }
+
+        int reuse = 1;
+        if (setsockopt(socketID, SOL_SOCKET, SO_REUSEADDR, (char*) &reuse, sizeof(reuse)) < 0)
+        {
+            close(socketID);
+            std::cout << "Erro ao determinar reuso do socket. Encerrando thread." << std::endl;
+            return NULL;
+        }
+
+        bzero(&socketLocal, sizeof(socketLocal));
+        socketLocal.sin_family = AF_INET;
+        socketLocal.sin_port = htons(porta);
+        socketLocal.sin_addr.s_addr = htonl(INADDR_ANY);
+        if (bind(socketID, (sockaddr*) &socketLocal, sizeof(socketLocal)))
+        {
+            close(socketID);
+            std::cout << "Erro ao fazer o bind do socket local. Encerrando thread de recebimento de mensagens." << std::endl;
+            return NULL;
+        }
+
+        grupo.imr_multiaddr.s_addr = inet_addr(enderecoGrupo);
+        grupo.imr_interface.s_addr = htonl(INADDR_ANY);
+        if (setsockopt(socketID, IPPROTO_IP, IP_ADD_MEMBERSHIP, &grupo, sizeof(grupo)) < 0)
+        {
+            std::cout << errno << " " << EBADF << " " << EFAULT << " " << EINVAL << " " << ENOPROTOOPT << " " << ENOTSOCK << std::endl; 
+            close(socketID);
+            std::cout << "Erro ao entrar no grupo de multicasting. Encerrando thread." << std::endl;
+            return NULL;
+        }
+
+        addrlend = sizeof(grupo);
+        pthread_mutex_lock(&controle->mutexEncerramento);
         while (!controle->sair)
         {
+            pthread_mutex_unlock(&controle->mutexEncerramento);
+ 
+            if (recvfrom(socketID, &m, sizeof(m), 0, (sockaddr*) &grupo, &addrlen)  < 0)
+            {
+                close(socketID);
+                std::cout << "Problemas no recebimento de mensagens. Encerrando thread." << std::endl;
+                return NULL;
+            }
+            std::cout << m.remetente << ">> " << m.texto << std::endl;
+
+            pthread_mutex_lock(&controle->mutexEncerramento);
         }
-        
+        pthread_mutex_unlock(&controle->mutexEncerramento);
+
+        close(socketID);        
         return NULL;
     }
 }
