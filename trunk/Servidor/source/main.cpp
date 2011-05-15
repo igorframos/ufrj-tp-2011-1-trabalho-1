@@ -46,7 +46,6 @@ int main (int argc, char *argv[])
     pthread_t threadEnvio,      // Apesar de os nomes serem autoexplicativos, trata-se dos ids
               threadConexao;    // das threads criadas pela main.
 
-    std::cout << "Criando thread de envio de mensagens." << std::endl;    
     if (pthread_create(&threadEnvio, NULL, funcoesThread::envioDeMensagens, (void*) &controle) != 0)
     {
         // Como não faz sentido um servidor que não pode enviar mensagens, o programa é abortado caso não
@@ -55,7 +54,6 @@ int main (int argc, char *argv[])
         exit(1);    
     }
     
-    std::cout << "Criando thread para recebimento de novas conexões." << std::endl;
     if (pthread_create(&threadConexao, NULL, funcoesThread::recebimentoDeConexoes, (void*) &controle) != 0)
     {
         // Como não faz sentido um servidor que não pode receber mensagens ou iniciar conexões, o programa é 

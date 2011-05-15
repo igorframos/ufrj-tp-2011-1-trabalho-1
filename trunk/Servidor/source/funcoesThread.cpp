@@ -61,12 +61,6 @@ namespace funcoesThread
         Controle *controle = (Controle*) ptr;   // Recebe as informações globais armazenadas
                                                 // na thread da main e passadas no ponteiro.
 
-        std::cout << "Thread de envio de mensagens criada corretamente." << std::endl;
-
-        // =======================================================================================================
-        // Experimentando criar o socket e o grupo UDP. Vamos ver no que dá isso.
-        // =======================================================================================================
-
         int socketID;
         const int porta = 2012;
         sockaddr_in grupo;
@@ -77,7 +71,7 @@ namespace funcoesThread
         if (socketID < 0)
         {
             std::cout << "Erro ao criar socket UDP. Encerrando thread de envio de mensagens." << std::endl;
-            return NULL;
+            exit(1);
         }
 
         bzero(&grupo, sizeof(grupo));
@@ -89,18 +83,11 @@ namespace funcoesThread
         {
             std::cout << "Erro ao preparar interface local para multicast via UDP. Encerrando thread." << std::endl;
             close(socketID);
-            return NULL;
+            exit(1);
         }
 
-        // =======================================================================================================
-        // Fim do experimento
-        // =======================================================================================================
-
-        pthread_mutex_lock(&controle->mutexEncerramento);   // Controle de concorrência da variável controle->sair.
         while (!(controle->sair))
         {
-            pthread_mutex_unlock(&controle->mutexEncerramento); // Destrava a variável controle->sair.
-
             pthread_mutex_lock(&controle->mutexFilaMensagens);  // Trava a fila de mensagens (controle de concorrência).
 
             while (!(controle->filaMensagens.empty()))          // Enquanto a fila de mensagens contiver alguém
@@ -113,17 +100,13 @@ namespace funcoesThread
                 {
                     close(socketID);
                     std::cout << "Erro ao enviar mensagem via socket UDP. Encerrando thread de envio de mensagens." << std::endl;
-                    return NULL;
+                    exit(1);
                 }
 
                 std::cout << m.remetente << ">> " << m.texto << std::endl;
-                std::cout << "Fila de mensagens tem " << controle->filaMensagens.size() << " mensagens na fila." << std::endl;
             }
             pthread_mutex_unlock(&controle->mutexFilaMensagens);    // Destrava a fila de mensagens.
-
-            pthread_mutex_lock(&controle->mutexEncerramento);   // Controle de concorrência da variável controle->sair.
         }
-        pthread_mutex_unlock(&controle->mutexEncerramento);
 
         close(socketID);
 
@@ -139,8 +122,6 @@ namespace funcoesThread
      */
     void *recebimentoDeConexoes (void *ptr)
     {
-        std::cout << "Thread de recebimento de conexões criada corretamente." << std::endl;
-
         Controle *controle = (Controle*) ptr;   // Recebe as informações globais armazenadas
                                                 // na thread main e passadas no ponteiro.
 
@@ -150,17 +131,16 @@ namespace funcoesThread
         if (!comunicacao::criaSocket(controle, socketID, serv_addr))
         {
             close(socketID);
-            return NULL;
+            exit(1);
         }
 
         if (!comunicacao::recebeConexoes(controle, socketID))
         {
             close(socketID);
-            return NULL;
+            exit(1);
         } 
 
         close(socketID);
-        std::cout << "Thread recebimentoDeConexoes encerrada." << std::endl;
         return NULL;
     }
 
@@ -172,8 +152,6 @@ namespace funcoesThread
      */
     void *recebimentoDeMensagens (void *ptr)
     {
-        std::cout << "Thread de recebimento de mensagens criada corretamente. Uma conexão foi estabelecida." << std::endl;
-
         // Recebe os dados e libera a memória da variável que foi usada só para passar essas informações.
         Dados *dados = (Dados*) ptr;
         Cliente cliente = *(dados->cliente);
@@ -182,19 +160,18 @@ namespace funcoesThread
         // Recebe um nome de usuário e o valida. Coloca o nome em cliente e insere cliente no set de clientes.
         if (!comunicacao::recebeNomeUsuario(controle, cliente))
         {
-            return NULL;
+            exit(1);
         }
         
         // Envia a lista de contatos online para o cliente.
         if (!comunicacao::enviaContatos(controle, cliente))
         {
-            return NULL;
+            exit(1);
         }
 
         // Fica recebendo as mensagens e adicionando à fila de mensagens a serem enviadas.
         comunicacao::recebeMensagens(controle, cliente);
 
-        std::cout << "Encerrando conxão de " << cliente.nome << "." << std::endl;
         pthread_mutex_lock(&controle->mutexListaClientes);
         controle->listaClientes.erase(controle->listaClientes.find(cliente));
         pthread_mutex_unlock(&controle->mutexListaClientes);

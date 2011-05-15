@@ -1,7 +1,7 @@
 OBJ = object/main.o object/funcoesThread.o
 CPP = source/main.cpp source/funcoesThread.cpp
 CC = g++
-DEBUG = -g
+DEBUG = 
 LFLAGS = -Wall -lm -lrt
 CFLAGS = -c -Wall -O2
 

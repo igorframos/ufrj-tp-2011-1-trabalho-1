@@ -49,8 +49,6 @@ namespace funcoesThread
     // Estabelece uma conexão TCP com o servidor para enviar as msgs e fica aguardando mensagens para serem enviadas.
     void *envioDeMensagens (void *ptr)
     {
-        std::cout << "Thread de envio de mensagens criada corretamente." << std::endl;
-        
         Controle *controle = (Controle*) ptr;
 
         int socketID;
@@ -61,16 +59,17 @@ namespace funcoesThread
         socketID = socket(AF_INET, SOCK_STREAM, 0);
         if (socketID < 0)
         {
-            std::cout << "Impossível abrir socket para comunicação externa. Encerrando thread." << std::endl;
-            return NULL;
+            std::cout << "Impossível abrir socket para comunicação externa. Encerrando programa." << std::endl;
+            exit(1);
         }
 
         // Está conectando sempre a localhost. Resolver isso.
         servidor = gethostbyname("localhost");
         if (!servidor)
         {
-            std::cout << "Servidor não encontrado. Encerrando thread." << std::endl;
-            return NULL;
+            close(socketID);
+            std::cout << "Servidor não encontrado. Encerrando programa." << std::endl;
+            exit(1);
         }
 
         bzero(&enderecoServidor, sizeof(enderecoServidor));
@@ -80,8 +79,9 @@ namespace funcoesThread
 
         if (connect(socketID, (sockaddr*) &enderecoServidor, sizeof(enderecoServidor)) < 0)
         {
-            std::cout << "Impossível estabelecer conexão com o servidor. Encerrando thread." << std::endl;
-            return NULL;
+            close(socketID);
+            std::cout << "Impossível estabelecer conexão com o servidor. Encerrando programa." << std::endl;
+            exit(1);
         }
 
         char nome[32];
@@ -93,13 +93,16 @@ namespace funcoesThread
 
             if (write(socketID, &nome, sizeof(nome)) < 0)
             {
-                std::cout << "Não foi possível enviar o nome para o servidor. Encerrando thread." << std::endl;
-                return NULL;
+                close(socketID);
+                std::cout << "Não foi possível enviar o nome para o servidor. Encerrando programa." << std::endl;
+                exit(1);
             }
 
             if (read(socketID, &nomeInvalido, sizeof(nomeInvalido)) < 0)
             {
-                std::cout << "Não foi possível receber resposta do servidor sobre o nome. Encerrando thread." << std::endl;
+                close(socketID); 
+                std::cout << "Não foi possível receber resposta do servidor sobre o nome. Encerrando programa." << std::endl;
+                exit(1);
             }
 
             if (nomeInvalido)
@@ -111,8 +114,9 @@ namespace funcoesThread
         int tamanhoListaClientes;
         if (read(socketID, &tamanhoListaClientes, sizeof(tamanhoListaClientes)) < 0)
         {
-            std::cout << "Erro no recebimento da lista de clientes ativos. Não recebido o tamanho. Encerrando thread." << std::endl;
-            return NULL;
+            close(socketID);
+            std::cout << "Erro no recebimento da lista de clientes ativos. Não recebido o tamanho. Encerrando programa." << std::endl;
+            exit(1);
         }
 
         for (int i = 0; i < tamanhoListaClientes; ++i)
@@ -121,8 +125,9 @@ namespace funcoesThread
 
             if (read(socketID, nomeCliente, sizeof(nomeCliente)) < 0)
             {
-                std::cout << "Não foi possível receber o nome de todos os clientes. Encerrando thread." << std::endl;
-                return NULL;
+                close(socketID);
+                std::cout << "Não foi possível receber o nome de todos os clientes. Encerrando programa." << std::endl;
+                exit(1);
             }
 
             pthread_mutex_lock(&controle->mutexListaClientes);
@@ -138,7 +143,6 @@ namespace funcoesThread
             Mensagem m;
             strncpy(m.remetente, nome, sizeof(m.remetente));
             strncpy(m.texto, linha, sizeof(m.texto));
-            std::cout << m.remetente << std::endl;
 
             if (write(socketID, &m, sizeof(m)) < 0)
             {
@@ -147,23 +151,18 @@ namespace funcoesThread
 
             if (!strcmp(linha, "exit_program"))
             {
-                pthread_mutex_lock(&controle->mutexEncerramento);
-                controle->sair = 1;
-                pthread_mutex_unlock(&controle->mutexEncerramento);
+                close(socketID);
+                std::cout << "Encerrando programa." << std::endl;
+                exit(0);
             }
         }
 
-        close(socketID);
-        std::cout << "Encerrando programa." << std::endl;
-        
         return NULL;
     }
-    
+
     // Estabelece uma conexão UDP com o servidor para receber as msgs enviadas via multicast.
     void *recebimentoDeMensagens (void *ptr)
     {
-        std::cout << "Thread de recebimento de mensagens criada corretamente." << std::endl;
-        
         Controle *controle = (Controle*) ptr;
 
         int socketID;
@@ -177,16 +176,16 @@ namespace funcoesThread
         socketID = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
         if (socketID < 0)
         {
-            std::cout << "Impossível abrir socket UDP para receber mensagens. Encerrando thread." << std::endl;
-            return NULL;
+            std::cout << "Impossível abrir socket UDP para receber mensagens. Encerrando programa." << std::endl;
+            exit(1);
         }
 
         int reuse = 1;
         if (setsockopt(socketID, SOL_SOCKET, SO_REUSEADDR, (char*) &reuse, sizeof(reuse)) < 0)
         {
             close(socketID);
-            std::cout << "Erro ao determinar reuso do socket. Encerrando thread." << std::endl;
-            return NULL;
+            std::cout << "Erro ao determinar reuso do socket. Encerrando programa." << std::endl;
+            exit(1);
         }
 
         bzero(&socketLocal, sizeof(socketLocal));
@@ -196,39 +195,47 @@ namespace funcoesThread
         if (bind(socketID, (sockaddr*) &socketLocal, sizeof(socketLocal)))
         {
             close(socketID);
-            std::cout << "Erro ao fazer o bind do socket local. Encerrando thread de recebimento de mensagens." << std::endl;
-            return NULL;
+            std::cout << "Erro ao fazer o bind do socket local. Encerrando programa." << std::endl;
+            exit(1);
         }
 
         grupo.imr_multiaddr.s_addr = inet_addr(enderecoGrupo);
         grupo.imr_interface.s_addr = htonl(INADDR_ANY);
         if (setsockopt(socketID, IPPROTO_IP, IP_ADD_MEMBERSHIP, &grupo, sizeof(grupo)) < 0)
         {
-            std::cout << errno << " " << EBADF << " " << EFAULT << " " << EINVAL << " " << ENOPROTOOPT << " " << ENOTSOCK << std::endl; 
             close(socketID);
-            std::cout << "Erro ao entrar no grupo de multicasting. Encerrando thread." << std::endl;
-            return NULL;
+            std::cout << "Erro ao entrar no grupo de multicasting. Encerrando programa." << std::endl;
+            exit(1);
         }
 
-        addrlend = sizeof(grupo);
-        pthread_mutex_lock(&controle->mutexEncerramento);
+        addrlen = sizeof(grupo);
         while (!controle->sair)
         {
-            pthread_mutex_unlock(&controle->mutexEncerramento);
- 
             if (recvfrom(socketID, &m, sizeof(m), 0, (sockaddr*) &grupo, &addrlen)  < 0)
             {
                 close(socketID);
-                std::cout << "Problemas no recebimento de mensagens. Encerrando thread." << std::endl;
-                return NULL;
+                std::cout << "Problemas no recebimento de mensagens. Encerrando programa." << std::endl;
+                exit(1);
             }
-            std::cout << m.remetente << ">> " << m.texto << std::endl;
 
-            pthread_mutex_lock(&controle->mutexEncerramento);
+            if (!strcmp(m.texto, "exit_program"))
+            {
+                pthread_mutex_lock(&controle->mutexListaClientes);
+                controle->listaClientes.erase(controle->listaClientes.find(m.remetente));
+                for (std::set<std::string>::iterator i = controle->listaClientes.begin(); i != controle->listaClientes.end(); ++i)
+                {
+                    std::cout << "Cliente " << *i << " online." << std::endl;
+                }
+                pthread_mutex_unlock(&controle->mutexListaClientes);
+            }
+            else
+            {
+                std::cout << m.remetente << ">> " << m.texto << std::endl;
+            }
         }
-        pthread_mutex_unlock(&controle->mutexEncerramento);
 
         close(socketID);        
         return NULL;
     }
 }
+
