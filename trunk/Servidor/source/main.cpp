@@ -66,12 +66,24 @@ int main (int argc, char *argv[])
     // entrada padrão, mas isso deve ser alterado para receber o comando de fechar da interface gráfica.
     while (!controle.sair)
     {
-        char c;
-        
-        std::cin >> c;        
-        if (c == 's' || c == 'S')
+        char linha[1024];
+        std::cin.getline(linha, 1024);
+
+        if (!strcmp(linha, "exit_program"))
         {
             controle.sair = 1;
+        }
+        else
+        {
+            char nome[32];
+
+            strcpy(nome, "SERVIDOR");
+
+            Mensagem m(nome, linha);
+
+            pthread_mutex_lock(&controle.mutexFilaMensagens);
+            controle.filaMensagens.push(m);
+            pthread_mutex_unlock(&controle.mutexFilaMensagens);
         }
     }
 
