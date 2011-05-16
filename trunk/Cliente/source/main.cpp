@@ -32,9 +32,8 @@
 
 int main (int argc, char *argv[])
 {
-    int sair = 0;
     pthread_t threadEnvio, threadRecebimento;
-    Controle controle(0);
+    Controle controle(0, argv[1]);
 
     if (pthread_create(&threadEnvio, NULL, funcoesThread::envioDeMensagens, (void*) &controle) != 0)
     {
@@ -42,7 +41,7 @@ int main (int argc, char *argv[])
         exit(1);
     }
     
-    if (pthread_create(&threadRecebimento, NULL, funcoesThread::recebimentoDeMensagens, (void*) &sair) != 0)
+    if (pthread_create(&threadRecebimento, NULL, funcoesThread::recebimentoDeMensagens, (void*) &controle) != 0)
     {
         std::cout << "Erro na criação da thread que receberia mensagnes. Programa será abortado." << std::endl;
         exit(1);

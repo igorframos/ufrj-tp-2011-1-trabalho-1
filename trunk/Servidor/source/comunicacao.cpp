@@ -19,7 +19,7 @@ namespace comunicacao
             // Retira este cliente da lista para encerrar a thread.
             controle->listaClientes.erase(controle->listaClientes.find(cliente.nome));
 
-            pthread_mutex_unlock(&controle->mutexListaClientes);
+            pthread_mutex_unlock(&controle->mutexListaClientes);    // Libera a lista de clientes.
             return false;
         }
 
@@ -28,7 +28,7 @@ namespace comunicacao
         {
             // Envia o nome do próximo cliente. Se não chegar, a thread deve ser encerrada.
             strncpy(nome, i->nome.c_str(), sizeof(nome));
-            if (write(cliente.socketEnvioID, (void*) nome, sizeof(nome)) < 0)
+            if (write(cliente.socketEnvioID, (void*) nome, 32) < 0)
             {
                 std::cout << "Não pude enviar mensagem com o tamanho da lista de usuários para " << cliente.socketEnvioID << ".";
                 std::cout << " Encerrando thread." << std::endl;
@@ -79,30 +79,29 @@ namespace comunicacao
             pthread_mutex_unlock(&controle->mutexListaClientes);    // Libera a lista de clientes.
         }
 
+        char texto[1024] = "new_client_connecting";
+        pthread_mutex_lock(&controle->mutexFilaMensagens);
+        controle->filaMensagens.push(Mensagem(nome, texto));
+        pthread_mutex_unlock(&controle->mutexFilaMensagens);
+
         return true;
     }
 
     void recebeMensagens(Controle* controle, Cliente& cliente)
     {
         Mensagem mensagem;      // Estrutura do tipo mensagem que será recebida do cliente.
-        pthread_mutex_lock(&controle->mutexEncerramento);   // Controle de concorrência da variável controle->sair.
         while (!(controle->sair))
         {
-            pthread_mutex_unlock(&controle->mutexEncerramento);  // Libera a variável controle->sair.
-
             read(cliente.socketEnvioID, &mensagem, sizeof(mensagem));  // Recebe uma mensagem do cliente.
-            if (!strcmp(mensagem.texto, "exit_program")) break;     // Acordo para dizer que o cliente está desconectando.
 
             // Controla a concorrência sobre a variável controle->filaMensagens com semáforos.
             // Insere a mensagem recebida na fila de mensagens a serem repassadas aos clientes.
             pthread_mutex_lock(&controle->mutexFilaMensagens);
             controle->filaMensagens.push(mensagem);
-            std::cout << "Fila de mensagens tem " << controle->filaMensagens.size() << " mensagens na fila." << std::endl;
             pthread_mutex_unlock(&controle->mutexFilaMensagens);
 
-            pthread_mutex_lock(&controle->mutexEncerramento);   // Controle de concorrência da variável controle->sair.
+            if (!strcmp(mensagem.texto, "exit_program")) break;     // Acordo para dizer que o cliente está desconectando.
         }
-        pthread_mutex_unlock(&controle->mutexEncerramento); // Libera variável controle->sair.
     }
 
     bool criaSocket(Controle* controle, int& socketID, sockaddr_in& serv_addr)
@@ -144,13 +143,9 @@ namespace comunicacao
 
     bool recebeConexoes(Controle* controle, const int socketID)
     {
-        // Para cada conexão recebida cria uma nova thread para lidar com ela e volta a esperar
-        // nova conexão externa.
-        pthread_mutex_lock(&controle->mutexEncerramento);   // Controle de concorrência na variável controle->sair.
+        // Para cada conexão recebida cria uma nova thread para lidar com ela e volta a esperar nova conexão externa.
         while (!controle->sair)
         {
-            pthread_mutex_unlock(&controle->mutexEncerramento); // Libera a variável controle->sair.
-
             Cliente *cliente = new Cliente();       // Cria um novo cliente e aguarda uma conexão.
             cliente->socketEnvioID = accept(socketID, (sockaddr*) &(cliente->endereco), &(cliente->tamanho));
             if (cliente->socketEnvioID < 0)
@@ -160,18 +155,15 @@ namespace comunicacao
             }
 
             Dados dados(cliente, controle);     // Cria uma estrutura para transferir dados para a nova thread.
-            // Os dados são as informações da conexão com o cliente e as
-            // variáveis de controle.
+                                                // Os dados são as informações da conexão com o cliente e as
+                                                // variáveis de controle.
 
             // Cria a thread que vai lidar especificamente com o cliente atual.
             if (pthread_create(&(cliente->thread), NULL, funcoesThread::recebimentoDeMensagens, (void*) &dados))
             {
                 std::cout << "Não é possível criar thread para o cliente. Ignorando conexão." << std::endl;
             }
-
-            pthread_mutex_lock(&controle->mutexEncerramento);   // Controle de concorrência na variável controle->sair.
         }
-        pthread_mutex_unlock(&controle->mutexEncerramento); // Libera variável controle->sair.
 
         return true;
     }

@@ -1,14 +1,3 @@
-/* 
- * Ideia de funcionamento desse programa Cliente:
- *  Cliente tem uma conexão TCP que envia mensagens para o Servidor.
- *  Cliente tem uma conexão UDP que recebe mensagens do Servidor.
- *  Quando um cliente deseja enviar uma mensagem, ele a envia ao Servidor que a repassa a todos os Clientes (inclusive ao próprio
- *      que enviou para ele) via multicast.
- *  O Cliente recebe a mensagem e acrescenta à janela de mensagens recebidas. Uma mensagem enviada, para a janela de mensagens
- *      recebidas, não existe. Esta só acrescenta uma nova mensagem quando ela chega do Servidor, ou seja, quando os destinatários não
- *      receberem a mensagem, exibe-se um alerta e o cliente vê a própria mensagem anexada ao final da conversa.
- */
-
 #include <cstdio>
 #include <iostream>
 #include <cstring>
@@ -51,11 +40,12 @@ namespace funcoesThread
     {
         Controle *controle = (Controle*) ptr;
 
-        int socketID;
-        hostent *servidor;
-        const int porta = 2011;
-        sockaddr_in enderecoServidor;
+        int socketID;                       // Identificador do socket TCP.
+        hostent *servidor;                  // Host da comunicação. 
+        const int porta = 2011;             // Comunicação TCP será feita na porta 2011.
+        sockaddr_in enderecoServidor;       // Informações sobre o servidor.
 
+        // Cria o socket TCP a ser usado no envio de mensagens.
         socketID = socket(AF_INET, SOCK_STREAM, 0);
         if (socketID < 0)
         {
@@ -63,8 +53,8 @@ namespace funcoesThread
             exit(1);
         }
 
-        // Está conectando sempre a localhost. Resolver isso.
-        servidor = gethostbyname("localhost");
+        // Encontrando informações sobre o servidor de verdade via DNS.
+        servidor = gethostbyname(controle->host);
         if (!servidor)
         {
             close(socketID);
@@ -72,11 +62,13 @@ namespace funcoesThread
             exit(1);
         }
 
+        // Determinando detalhes sobre o servidor.
         bzero(&enderecoServidor, sizeof(enderecoServidor));
         enderecoServidor.sin_family = AF_INET;
         enderecoServidor.sin_port = htons(porta);
         bcopy((char*) servidor->h_addr, (char*) &enderecoServidor.sin_addr.s_addr, servidor->h_length);
 
+        // Conectando ao servidor.
         if (connect(socketID, (sockaddr*) &enderecoServidor, sizeof(enderecoServidor)) < 0)
         {
             close(socketID);
@@ -84,78 +76,15 @@ namespace funcoesThread
             exit(1);
         }
 
+        // Espera que o usuário dê seu nome e guarda na variável nome.
         char nome[32];
-        bool nomeInvalido = true;
-        while (nomeInvalido)
-        {
-            std::cin.getline(nome, 32);
-            std::cout << "Nome escolhido: " << nome << std::endl;
+        comunicacao::escolheNome(controle, nome, socketID);
+        
+        // Recebe a lista de clientes do servidor.
+        comunicacao::recebeListaClientes(controle, socketID);
 
-            if (write(socketID, &nome, sizeof(nome)) < 0)
-            {
-                close(socketID);
-                std::cout << "Não foi possível enviar o nome para o servidor. Encerrando programa." << std::endl;
-                exit(1);
-            }
-
-            if (read(socketID, &nomeInvalido, sizeof(nomeInvalido)) < 0)
-            {
-                close(socketID); 
-                std::cout << "Não foi possível receber resposta do servidor sobre o nome. Encerrando programa." << std::endl;
-                exit(1);
-            }
-
-            if (nomeInvalido)
-            {
-                std::cout << "Nome não disponível. Tente novamente." << std::endl;
-            }
-        }
-
-        int tamanhoListaClientes;
-        if (read(socketID, &tamanhoListaClientes, sizeof(tamanhoListaClientes)) < 0)
-        {
-            close(socketID);
-            std::cout << "Erro no recebimento da lista de clientes ativos. Não recebido o tamanho. Encerrando programa." << std::endl;
-            exit(1);
-        }
-
-        for (int i = 0; i < tamanhoListaClientes; ++i)
-        {
-            char nomeCliente[32];
-
-            if (read(socketID, nomeCliente, sizeof(nomeCliente)) < 0)
-            {
-                close(socketID);
-                std::cout << "Não foi possível receber o nome de todos os clientes. Encerrando programa." << std::endl;
-                exit(1);
-            }
-
-            pthread_mutex_lock(&controle->mutexListaClientes);
-            controle->listaClientes.insert(nomeCliente);
-            pthread_mutex_unlock(&controle->mutexListaClientes);
-        }
-
-        while (!controle->sair)
-        {
-            char linha[1024];
-            std::cin.getline(linha, 1024);
-
-            Mensagem m;
-            strncpy(m.remetente, nome, sizeof(m.remetente));
-            strncpy(m.texto, linha, sizeof(m.texto));
-
-            if (write(socketID, &m, sizeof(m)) < 0)
-            {
-                std::cout << "Mensagem não pôde ser enviada." << std::endl;
-            }
-
-            if (!strcmp(linha, "exit_program"))
-            {
-                close(socketID);
-                std::cout << "Encerrando programa." << std::endl;
-                exit(0);
-            }
-        }
+        // Envia mensagens para o servidor.
+        comunicacao::enviaMensagens(controle, socketID, nome); 
 
         return NULL;
     }
@@ -165,14 +94,15 @@ namespace funcoesThread
     {
         Controle *controle = (Controle*) ptr;
 
-        int socketID;
-        ip_mreq grupo;
-        sockaddr_in socketLocal;
-        Mensagem m;
-        const int porta = 2012;
-        char enderecoGrupo[] = "230.145.0.1";
-        socklen_t addrlen;
+        int socketID;               // Identificador do socket UDP.
+        ip_mreq grupo;              // Informações do grupo para que seja possível adicionar este programa ao mesmo.
+        sockaddr_in socketLocal;    // Informações sobre o socket local usado para a comunicação com o grupo.
+        Mensagem m;                 // Mensagem que será recebida.
+        const int porta = 2012;     // A comunicação do grupo se dará pela porta 2012.
+        char enderecoGrupo[] = "230.145.0.1";   // Endereço IP do grupo. Deve ser na faixa de 224.0.1.0 a 239.255.255.255.
+        socklen_t addrlen;          // Variável com o tamanho do endereço do grupo para ser passada ao recvfrom.
 
+        // Cria socket UDP.
         socketID = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
         if (socketID < 0)
         {
@@ -180,6 +110,7 @@ namespace funcoesThread
             exit(1);
         }
 
+        // Determina que este socket pode ser reutilizado.
         int reuse = 1;
         if (setsockopt(socketID, SOL_SOCKET, SO_REUSEADDR, (char*) &reuse, sizeof(reuse)) < 0)
         {
@@ -188,6 +119,7 @@ namespace funcoesThread
             exit(1);
         }
 
+        // Determina detalhes sobre o socket local e cria o endereço de fato.
         bzero(&socketLocal, sizeof(socketLocal));
         socketLocal.sin_family = AF_INET;
         socketLocal.sin_port = htons(porta);
@@ -199,6 +131,7 @@ namespace funcoesThread
             exit(1);
         }
 
+        // Entra no grupo para que seja possível receber as mensagens enviadas para ele.
         grupo.imr_multiaddr.s_addr = inet_addr(enderecoGrupo);
         grupo.imr_interface.s_addr = htonl(INADDR_ANY);
         if (setsockopt(socketID, IPPROTO_IP, IP_ADD_MEMBERSHIP, &grupo, sizeof(grupo)) < 0)
@@ -208,6 +141,8 @@ namespace funcoesThread
             exit(1);
         }
 
+        // Recebe uma mensagem e imprime no console. Caso ser um aviso de que um cliente desconectou, o remove da
+        // lista de clientes e imprime a lista atual.
         addrlen = sizeof(grupo);
         while (!controle->sair)
         {
@@ -221,12 +156,22 @@ namespace funcoesThread
             if (!strcmp(m.texto, "exit_program"))
             {
                 pthread_mutex_lock(&controle->mutexListaClientes);
-                controle->listaClientes.erase(controle->listaClientes.find(m.remetente));
-                for (std::set<std::string>::iterator i = controle->listaClientes.begin(); i != controle->listaClientes.end(); ++i)
+
+                std::set<std::string>::iterator it = controle->listaClientes.find(m.remetente);
+                if (it != controle->listaClientes.end())
                 {
-                    std::cout << "Cliente " << *i << " online." << std::endl;
+                    std::cout << m.remetente << " desconectou-se." << std::endl;
+                    controle->listaClientes.erase(it);
                 }
                 pthread_mutex_unlock(&controle->mutexListaClientes);
+            }
+            else if (!strcmp(m.texto, "new_client_connecting"))
+            {
+                pthread_mutex_lock(&controle->mutexListaClientes);
+                controle->listaClientes.insert(m.remetente);
+                pthread_mutex_unlock(&controle->mutexListaClientes);
+
+                std::cout << m.remetente << " conectou-se." << std::endl;
             }
             else
             {

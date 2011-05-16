@@ -1,24 +1,3 @@
-/*
- * Funções usadas nas threads do programa.
- *
- * Envio de mensagens, recebimento de conexões e recebimento de mensagens são as tarefas que devem
- * ser executadas pelas threads.
- *
- * FIX
- *
- * Refatorar o código para dividir essa joça em funções.
- *
- * TODO
- *
- * Falta fazer o pedaço de enviar mensagens via UDP e enviar para o cliente a questão de se inscrever
- * no grupo UDP.
- *
- * BUGS:
- *  - Recebimento de conexões não está recebendo o sinal de finalizar o programa. Provavelmente
- *    está presa no accept de novas conexões. Ainda não sei como resolver.
- *  - Possivelmente, semáforos.  
- */
-
 #include <iostream>
 #include <unistd.h>
 #include <pthread.h>
@@ -61,12 +40,13 @@ namespace funcoesThread
         Controle *controle = (Controle*) ptr;   // Recebe as informações globais armazenadas
                                                 // na thread da main e passadas no ponteiro.
 
-        int socketID;
-        const int porta = 2012;
-        sockaddr_in grupo;
-        char enderecoGrupo[] = "230.145.0.1";
-        in_addr interfaceLocal;
+        int socketID;               // Identificador do socket UDP.
+        const int porta = 2012;     // Porta que será usada para envio de mensagens.
+        sockaddr_in grupo;          // Informações sobre o grupo para o qual serão enviadas as mensagens.
+        char enderecoGrupo[] = "230.145.0.1";   // Endereço IP do grupo.
+        in_addr interfaceLocal;     // Interface usada para ser enviar as mensagens.
 
+        // Iniciando o socket UDP. (SOCK_DGRAM)
         socketID = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
         if (socketID < 0)
         {
@@ -74,6 +54,7 @@ namespace funcoesThread
             exit(1);
         }
 
+        // Estabelecendo detalhes da comunicação para envio das mensagens via UDP.
         bzero(&grupo, sizeof(grupo));
         grupo.sin_family = AF_INET;
         grupo.sin_addr.s_addr = inet_addr(enderecoGrupo);
@@ -95,7 +76,7 @@ namespace funcoesThread
                 Mensagem m = controle->filaMensagens.front();   // Retirar primeira mensagem da fila e enviar.
                 controle->filaMensagens.pop();
 
-                // Código ainda em teste que deveria enviar uma mensagem.
+                // Envia mensagem via UDP para um grupo predeterminado.
                 if (sendto(socketID, &m, sizeof(m), 0, (sockaddr*) &grupo, sizeof(grupo)) < 0)
                 {
                     close(socketID);
@@ -103,13 +84,25 @@ namespace funcoesThread
                     exit(1);
                 }
 
-                std::cout << m.remetente << ">> " << m.texto << std::endl;
+                // Imprime no console a mensagem enviada precedida pelo nome do usuário que a enviou caso a mensagem
+                // não seja um aviso de que o usuário desconectou. Do contrário, imprime que o usuário se desconectou
+                if (!strcmp(m.texto, "exit_program"))
+                {
+                    std::cout << m.remetente << " desconectou-se." << std::endl;
+                }
+                else if (!strcmp(m.texto, "new_client_connecting"))
+                {
+                    std::cout << m.remetente << " conectou-se." << std::endl;
+                }
+                else
+                {
+                    std::cout << m.remetente << ">> " << m.texto << std::endl;
+                }
             }
             pthread_mutex_unlock(&controle->mutexFilaMensagens);    // Destrava a fila de mensagens.
         }
 
         close(socketID);
-
         std::cout << "Thread envioDeMensagens encerrada." << std::endl;
         return NULL;
     }
@@ -128,12 +121,14 @@ namespace funcoesThread
         int socketID;           // Identificador do socket que receberá as conexões.
         sockaddr_in serv_addr;  // Cria um endereço para o servidor.
 
+        // Sai do programa com status 1 (falha) se não conseguir criar o socket TCP que recebe as mensagens.
         if (!comunicacao::criaSocket(controle, socketID, serv_addr))
         {
             close(socketID);
             exit(1);
         }
 
+        // Sai do programa com status 1 (falha) se houver problemas com a criação de comunicações.
         if (!comunicacao::recebeConexoes(controle, socketID))
         {
             close(socketID);
@@ -172,10 +167,10 @@ namespace funcoesThread
         // Fica recebendo as mensagens e adicionando à fila de mensagens a serem enviadas.
         comunicacao::recebeMensagens(controle, cliente);
 
+        // Remove um cliente da lista de clientes se a sua thread for terminar.
         pthread_mutex_lock(&controle->mutexListaClientes);
         controle->listaClientes.erase(controle->listaClientes.find(cliente));
         pthread_mutex_unlock(&controle->mutexListaClientes);
-        std::cout << "Conexão de " << cliente.nome << " encerrada." << std::endl;
 
         return NULL;
     }

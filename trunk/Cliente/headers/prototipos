@@ -1,10 +1,20 @@
 #ifndef __PROTOTIPOS__
 #define __PROTOTIPOS__
 
+#include "controle"
+#include "mensagem"
+
 namespace funcoesThread
 {
     void* envioDeMensagens (void *ptr);
     void* recebimentoDeMensagens (void *ptr);
+}
+
+namespace comunicacao
+{
+    void escolheNome(Controle* controle, char nome[32], int socketID);
+    void recebeListaClientes(Controle* controle, int socketID);
+    void enviaMensagens(Controle* controle, int socketID, char nome[32]);
 }
 
 #endif
