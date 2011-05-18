@@ -1,0 +1,14 @@
+#ifndef __PROTOTIPOS__
+#define __PROTOTIPOS__
+
+#include "controle"
+#include "mensagem"
+
+namespace comunicacao
+{
+    void recebeListaClientes(int socketID);
+    void enviaMensagens(int socketID, char nome[32]);
+}
+
+#endif
+

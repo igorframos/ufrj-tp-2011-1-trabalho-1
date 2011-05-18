@@ -1,0 +1,26 @@
+#ifndef __CONTROLE__
+#define __CONTROLE__
+
+#include <cstring>
+#include <pthread.h>
+
+struct Controle
+{
+    int sair;
+    std::set<std::string> listaClientes;
+    char host[64];
+
+    pthread_mutex_t mutexEncerramento;
+    pthread_mutex_t mutexListaClientes;
+
+    Controle(int sair = 0): sair(sair) {}
+    Controle(int sair, char hostname[64]): sair(sair)
+    {
+        strncpy(host, hostname, sizeof(host));
+        pthread_mutex_init(&mutexEncerramento, NULL);
+        pthread_mutex_init(&mutexListaClientes, NULL);
+    }
+};
+
+#endif
+
