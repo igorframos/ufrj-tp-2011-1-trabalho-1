@@ -1,0 +1,17 @@
+#ifndef __DADOS__
+#define __DADOS__
+
+#include "cliente.h"
+#include "controle"
+
+struct Dados
+{
+    Cliente *cliente;
+    Controle *controle;
+
+    Dados(Cliente *cliente = NULL, Controle *controle = NULL): cliente(cliente), controle(controle) {}
+    ~Dados() {}
+};
+
+#endif
+

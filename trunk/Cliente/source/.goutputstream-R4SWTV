@@ -1,0 +1,13 @@
+#include <iostream>
+#include <string>
+#include <unistd.h>
+#include <pthread.h>
+#include <cstdlib>
+
+int main (int argc, char *argv[])
+{
+    std::cout << "Hello, world!" << std::endl;
+    
+    return 0;
+}
+
